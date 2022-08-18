@@ -429,3 +429,24 @@ static int SetName(lua_State *L)
 }
 ```
 所以两者的区别在于**c++返回给lua的数据,如何在lua调用c++的时候传递给c++**
+
+那luna导出的函数调用是如何获取实际函数参数的,比如`navmesh_instance.set_flags_(32767, 0);`通过`lua_pushcclosure(L, _lua_object_bridge, 2);`将闭包push到栈上,在没push之前,栈上有两个数据`obj`和`adapter`,push之后栈变成三个数据,栈顶是lua_CFunction。这样push之后,lua会调用这个lua_CFunction并且将实际的参数`(32767,0)`入栈,所以`_lua_object_bridge`的发起方是lua侧,在`_lua_object_bridge`函数的内部可以通过`upvalueindex`获取`obj`和`adapter`,栈上1位置是32767,2位置是0
+
+可以看个例子
+```lua
+local tb = {"tb"}
+local mt = {
+  ["__index"] = function(self, ...)
+    -- 这里的return SetName相当于lua_pushcclosure(L, _lua_object_bridge, 2);
+    -- 所以print(xx)的输出是Nioh
+    -- 而这里的...就是SetName字符串, 在luna内部通过SetName字符串找到对应的函数
+    -- 这里的演示是直接给出SetName函数,本质就是主动把要调用的函数入栈,让lua自己调用
+    local function SetName(xx)
+      print(xx) --Nioh
+    end
+    return SetName
+  end
+}
+setmetatable(tb, mt)
+tb.SetName("Nioh")
+```
